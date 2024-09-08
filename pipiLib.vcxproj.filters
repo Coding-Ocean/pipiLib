@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="WINDOW.cpp" />
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="GRAPHIC.cpp" />
+    <ClCompile Include="stb_image.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="WINDOW.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="GRAPHIC.h" />
+    <ClInclude Include="d3dx12.h" />
+    <ClInclude Include="stb_image.h" />
+    <ClInclude Include="SHADER_RESOURCE.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="LambertVS.hlsl" />
+    <FxCompile Include="LambertPS.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="LambertCB.hlsli" />
+  </ItemGroup>
+</Project>
