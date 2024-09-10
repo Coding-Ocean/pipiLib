@@ -135,7 +135,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="FLOAT3.cpp" />
     <ClCompile Include="GRAPHIC.cpp" />
+    <ClCompile Include="MATRIX.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
@@ -145,18 +147,33 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3dx12.h" />
+    <ClInclude Include="FLOAT3.h" />
+    <ClInclude Include="FLOAT4.h" />
     <ClInclude Include="GRAPHIC.h" />
+    <ClInclude Include="MATRIX.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="QUATERNION.h" />
     <ClInclude Include="SHADER_RESOURCE.h" />
     <ClInclude Include="stb_image.h" />
+    <ClInclude Include="WARNING.h" />
     <ClInclude Include="WINDOW.h" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="LambertPS.hlsl" />
-    <FxCompile Include="LambertVS.hlsl" />
+    <FxCompile Include="LambertPS.hlsl">
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">res/%(Filename).cso</ObjectFileOutput>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">res/%(Filename).cso</ObjectFileOutput>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="LambertVS.hlsl">
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">res/%(Filename).cso</ObjectFileOutput>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">res/%(Filename).cso</ObjectFileOutput>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="LambertCB.hlsli" />
+    <None Include="Root.hlsli" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,4 +1,4 @@
-#include"LambertCB.hlsli"
+#include"Root.hlsli"
 
 struct IN {
     float4 pos     : SV_POSITION;
@@ -6,6 +6,6 @@ struct IN {
     float2 tex     : TEXCOORD;
 };
 
-float4 main( IN i) : SV_Target {
+float4 main( IN i ) : SV_TARGET {
     return Texture.Sample( Sampler, i.tex ) * i.diffuse;
 }

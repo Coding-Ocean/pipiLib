@@ -1,67 +1,75 @@
 #pragma once
-
 using namespace Microsoft::WRL;
 
 class GRAPHIC
 {
 public:
     static GRAPHIC& instance();
+
     void create();
     void destroy();
     void clear(float r=0.0f, float g=0.0f, float b=0.0f);
     void present();
 
-    //void setPipeline();
+    void setPipeline();
 
-    //void createVtxPosition(
-    //    std::vector<float>positions,
-    //    ID3D12Resource** positionBuf,
-    //    D3D12_VERTEX_BUFFER_VIEW* positionBufView
-    //);
-    //void createVtxPosition(
-    //    float* positions, size_t size,
-    //    ID3D12Resource** positionBuf,
-    //    D3D12_VERTEX_BUFFER_VIEW* positionBufView
-    //);
-    //void createVtxTexcoord(
-    //    float* texcoords, size_t size,
-    //    ID3D12Resource** texcoordBuf,
-    //    D3D12_VERTEX_BUFFER_VIEW* texcoordBufView
-    //);
-    //void createIndex(
-    //    unsigned short* indices, size_t size, 
-    //    ID3D12Resource** indexBuf,
-    //    D3D12_INDEX_BUFFER_VIEW* indexBufView
-    //);
-    //struct CONST_BUF1 {
-    //    XMMATRIX world;
-    //    XMFLOAT4 diffuse;
-    //};
-    //void createConstBuf1(
-    //    size_t size,
-    //    ID3D12Resource** constBuf1,
-    //    CONST_BUF1** mapConstBuf1
-    //);
-    //void createTextureBuf(
-    //    const char* filename,
-    //    ID3D12Resource** textureBuf
-    //);
-    //void createCbvTbvHeap(
-    //    ID3D12Resource* constBuf1,
-    //    ID3D12Resource* textureBuf,
-    //    ID3D12DescriptorHeap** CbvTbvHeap
-    //);
-    //void draw(
-    //    D3D12_VERTEX_BUFFER_VIEW& positionBufView,
-    //    D3D12_VERTEX_BUFFER_VIEW& texcoordBufView,
-    //    D3D12_INDEX_BUFFER_VIEW& indexBufView,
-    //    UINT numIndices,
-    //    ID3D12DescriptorHeap* CbvTbvHeap
-    //);
+    void createVertexBuf(
+        float* vertices, size_t size, UINT stride,
+        ID3D12Resource** vertexBuf,
+        D3D12_VERTEX_BUFFER_VIEW* vertexBufView
+    );
+    void createIndexBuf(
+        unsigned short* indices, size_t size, 
+        ID3D12Resource** indexBuf,
+        D3D12_INDEX_BUFFER_VIEW* indexBufView
+    );
+
+    //コンスタントバッファ構造体
+    struct CONST_BUF0 {
+        class MATRIX proj;
+        class MATRIX view;
+        class FLOAT3 lightPos;
+    };
+    struct CONST_BUF1 {
+        class MATRIX world;
+    };
+    struct CONST_BUF2 {
+        struct FLOAT4 diffuse;
+        struct FLOAT4 ambient;
+        struct FLOAT4 specular;
+    };
+    void createConstBuf(
+        size_t size,
+        ID3D12Resource** constBuf,
+        void** constBufMap
+    );
+    
+    void createTextureBuf(
+        LPCWSTR filename,
+        ID3D12Resource** textureBuf
+    );
+
+    //ルートテーブルに対応するディスクリプタヒープをつくる
+    void createCbvTbvHeap(
+        ID3D12Resource* constBuf1,
+        ID3D12Resource* constBuf2,
+        ID3D12Resource* textureBuf,
+        ID3D12DescriptorHeap** CbvTbvHeap
+    );
+
+    void draw(
+        D3D12_VERTEX_BUFFER_VIEW& positionBufView,
+        D3D12_VERTEX_BUFFER_VIEW& normalBufView,
+        D3D12_VERTEX_BUFFER_VIEW& texcoordBufView,
+        D3D12_INDEX_BUFFER_VIEW& indexBufView,
+        ID3D12DescriptorHeap* CbvTbvHeap
+    );
 private:
     void WaitDrawDone();
+
     //デバッグ
     HRESULT Hr;
+
     //デバイス
     ComPtr<ID3D12Device> Device;
     //コマンド
@@ -72,30 +80,28 @@ private:
     ComPtr<ID3D12Fence> Fence;
     HANDLE FenceEvent;
     UINT64 FenceValue;
+
     //スワップチェイン、バックバッファ
     ComPtr<IDXGISwapChain4> SwapChain;
-    ComPtr<ID3D12Resource> BackBufs[2];//Bb
-    ComPtr<ID3D12DescriptorHeap> BackBufViewHeap;//BbvHeap
+    ComPtr<ID3D12Resource> BackBufs[2];
     UINT BackBufIdx;
-    UINT BackBufViewHeapSize;
+    ComPtr<ID3D12DescriptorHeap> BbvHeap;//BackBufViewHeap
+    UINT BbvHeapSize;
     //デプスバッファ
     ComPtr<ID3D12Resource> DepthStencilBuf;
-    ComPtr<ID3D12DescriptorHeap> DepthStencilBufViewHeap;
+    ComPtr<ID3D12DescriptorHeap> DsvHeap;//DepthStencilBufViewHeap
+
+    //コンスタントバッファ０
+    ComPtr<ID3D12Resource> ConstBuf0;
+    CONST_BUF0* ConstBuf0Map{};
+    ComPtr<ID3D12DescriptorHeap> Cb0vHeap;
 
     //パイプライン
     ComPtr<ID3D12RootSignature> RootSignature;
     ComPtr<ID3D12PipelineState> PipelineState;
     D3D12_VIEWPORT Viewport{};
     D3D12_RECT ScissorRect{};
-    //コンスタントバッファ０構造体
-    struct CONST_BUF0 {
-        XMMATRIX proj;
-        XMMATRIX view;
-    };
-    //コンスタントバッファ０
-    ComPtr<ID3D12Resource> ConstBuf0;
-    CONST_BUF0* MapConstBuf0{};
-    ComPtr<ID3D12DescriptorHeap> CbvHeap;
+
     //シングルトン
     GRAPHIC() {};
     GRAPHIC(const GRAPHIC&) = delete;

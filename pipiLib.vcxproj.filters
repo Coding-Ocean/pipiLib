@@ -1,24 +1,82 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="WINDOW.cpp" />
-    <ClCompile Include="pch.cpp" />
-    <ClCompile Include="GRAPHIC.cpp" />
-    <ClCompile Include="stb_image.cpp" />
+    <ClCompile Include="GRAPHIC.cpp">
+      <Filter>SYSTEM</Filter>
+    </ClCompile>
+    <ClCompile Include="stb_image.cpp">
+      <Filter>SYSTEM</Filter>
+    </ClCompile>
+    <ClCompile Include="WINDOW.cpp">
+      <Filter>SYSTEM</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>SYSTEM</Filter>
+    </ClCompile>
+    <ClCompile Include="MATRIX.cpp">
+      <Filter>MATH</Filter>
+    </ClCompile>
+    <ClCompile Include="FLOAT3.cpp">
+      <Filter>MATH</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="WINDOW.h" />
-    <ClInclude Include="pch.h" />
-    <ClInclude Include="GRAPHIC.h" />
-    <ClInclude Include="d3dx12.h" />
-    <ClInclude Include="stb_image.h" />
-    <ClInclude Include="SHADER_RESOURCE.h" />
+    <ClInclude Include="d3dx12.h">
+      <Filter>SYSTEM</Filter>
+    </ClInclude>
+    <ClInclude Include="GRAPHIC.h">
+      <Filter>SYSTEM</Filter>
+    </ClInclude>
+    <ClInclude Include="SHADER_RESOURCE.h">
+      <Filter>SYSTEM</Filter>
+    </ClInclude>
+    <ClInclude Include="stb_image.h">
+      <Filter>SYSTEM</Filter>
+    </ClInclude>
+    <ClInclude Include="WARNING.h">
+      <Filter>SYSTEM</Filter>
+    </ClInclude>
+    <ClInclude Include="WINDOW.h">
+      <Filter>SYSTEM</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>SYSTEM</Filter>
+    </ClInclude>
+    <ClInclude Include="FLOAT4.h">
+      <Filter>MATH</Filter>
+    </ClInclude>
+    <ClInclude Include="MATRIX.h">
+      <Filter>MATH</Filter>
+    </ClInclude>
+    <ClInclude Include="QUATERNION.h">
+      <Filter>MATH</Filter>
+    </ClInclude>
+    <ClInclude Include="FLOAT3.h">
+      <Filter>MATH</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="LambertVS.hlsl" />
-    <FxCompile Include="LambertPS.hlsl" />
+    <FxCompile Include="LambertPS.hlsl">
+      <Filter>SHADER</Filter>
+    </FxCompile>
+    <FxCompile Include="LambertVS.hlsl">
+      <Filter>SHADER</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="LambertCB.hlsli" />
+    <Filter Include="SYSTEM">
+      <UniqueIdentifier>{b62b854c-97d9-4e46-80f3-cd9046d43dca}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SHADER">
+      <UniqueIdentifier>{ae06fb18-63ec-4ed3-ab12-2fc4c96b2c44}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MATH">
+      <UniqueIdentifier>{a41c292e-674a-4846-8401-f766acc65941}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Root.hlsli">
+      <Filter>SHADER</Filter>
+    </None>
   </ItemGroup>
 </Project>

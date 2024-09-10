@@ -5,3 +5,5 @@
 #include<wrl.h>
 #include"d3dx12.h"
 #include"stb_image.h"
+#include"FLOAT4.h"
+#include"MATRIX.h"

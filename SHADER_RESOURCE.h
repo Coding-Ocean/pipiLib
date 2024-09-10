@@ -1,29 +1,31 @@
 #pragma once
 #include"pch.h"
+#include"WARNING.h"
 class SHADER_RESOURCE
 {
 public:
-    SHADER_RESOURCE(LPCWSTR resName) :Succeeded(false)
+    SHADER_RESOURCE(LPCWSTR resName)
+        :Succeeded(false)
     {
         HINSTANCE hInst = GetModuleHandle(0);
         HRSRC hRes = FindResource(hInst, resName, L"SHADER");
-        //WARNING(hRes == 0, "リソースがみつからない", "");
-        // リソースのサイズを取得する 
+        WARNING(hRes == 0, L"リソースがみつからない", resName);
+        //リソースのサイズを取得する 
         DWORD sizeOfRes = SizeofResource(hInst, hRes);
-        //WARNING(sizeOfRes == 0, "リソースのサイズがゼロ", "");
-        // 取得したリソースをメモリにロードする
+        WARNING(sizeOfRes == 0, L"リソースのサイズがゼロ", L"");
+        //取得したリソースをメモリにロードする
         HGLOBAL hMem = LoadResource(hInst, hRes);
-        //WARNING(HMem == 0, "リソースがロードできない", "");
-        // ロードしたリソースデータのアドレスを取得する
+        WARNING(hMem == 0, L"リソースがロードできない", L"");
+        //ロードしたリソースデータのアドレスを取得する
         const char* mem = (const char*)LockResource(hMem);
         if (mem == 0) {
             FreeResource(hMem);
-            //WARNING(true, "リソースのアドレスが取得できない", "");
+            WARNING(true, L"リソースのアドレスが取得できない", L"");
             return;
         }
         //Bufferにコピー
         Succeeded = true;
-        Buffer.assign(mem,sizeOfRes);
+        Buffer.assign(mem, sizeOfRes);
         FreeResource(hMem);
     }
     bool succeeded() const

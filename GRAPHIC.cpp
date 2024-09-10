@@ -1,7 +1,8 @@
 #include"pch.h"
+#include"WARNING.h"
+#include"SHADER_RESOURCE.h"
 #include"WINDOW.h"
 #include"GRAPHIC.h"
-#include"SHADER_RESOURCE.h"
 #include<memory>
 
 #pragma comment(lib,"dxgi.lib")
@@ -15,7 +16,9 @@ GRAPHIC& GRAPHIC::instance()
 
 void GRAPHIC::create()
 {
-	//デバイス
+	auto& w = WINDOW::instance();
+
+	//デバイス、コマンド、フェンス
 	{
 #ifdef _DEBUG
 		//デバッグバージョンではデバッグレイヤーを有効化する
@@ -61,8 +64,7 @@ void GRAPHIC::create()
 			FenceValue = 1;
 		}
 	}
-	//リソース
-	auto& w = WINDOW::instance();
+	//レンダーターゲット
 	{
 		//スワップチェインをつくる(ここにバックバッファが含まれている)
 		{
@@ -95,15 +97,15 @@ void GRAPHIC::create()
 			desc.NumDescriptors = 2;//バックバッファビュー２つ
 			desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;//RenderTargetView
 			desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;//シェーダからアクセスしないのでNONEでOK
-			Hr = Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&BackBufViewHeap));
+			Hr = Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&BbvHeap));
 			assert(SUCCEEDED(Hr));
 		}
 		//バックバッファ「ビュー」を「ディスクリプタヒープ」につくる
 		{
 			D3D12_CPU_DESCRIPTOR_HANDLE hBbvHeap
-				= BackBufViewHeap->GetCPUDescriptorHandleForHeapStart();
+				= BbvHeap->GetCPUDescriptorHandleForHeapStart();
 
-			BackBufViewHeapSize
+			BbvHeapSize
 				= Device->GetDescriptorHandleIncrementSize(
 					D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
@@ -112,7 +114,7 @@ void GRAPHIC::create()
 				Hr = SwapChain->GetBuffer(idx, IID_PPV_ARGS(&BackBufs[idx]));
 				assert(SUCCEEDED(Hr));
 				//バックバッファのビューをヒープにつくる
-				hBbvHeap.ptr += idx * BackBufViewHeapSize;
+				hBbvHeap.ptr += idx * BbvHeapSize;
 				Device->CreateRenderTargetView(BackBufs[idx].Get(), nullptr, hBbvHeap);
 			}
 		}
@@ -153,7 +155,7 @@ void GRAPHIC::create()
 			desc.NumDescriptors = 1;//深度ビュー1つのみ
 			desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;//デプスステンシルビューとして使う
 			desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-			Hr = Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&DepthStencilBufViewHeap));
+			Hr = Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&DsvHeap));
 			assert(SUCCEEDED(Hr));
 		}
 		//デプスステンシルバッファ「ビュー」を「ディスクリプタヒープ」につくる
@@ -163,34 +165,60 @@ void GRAPHIC::create()
 			desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;//2Dテクスチャ
 			desc.Flags = D3D12_DSV_FLAG_NONE;//フラグは特になし
 			D3D12_CPU_DESCRIPTOR_HANDLE hDsvHeap
-				= DepthStencilBufViewHeap->GetCPUDescriptorHandleForHeapStart();
+				= DsvHeap->GetCPUDescriptorHandleForHeapStart();
 			Device->CreateDepthStencilView(DepthStencilBuf.Get(), &desc, hDsvHeap);
 		}
+	}{}
+	//コンスタントバッファ０をつくり、デフォルト値をいれておく
+	{
+		createConstBuf(256, &ConstBuf0, (void**)&ConstBuf0Map);
+		//コンスタントバッファ０の「ビュー」の入れ物である「ディスクリプタヒープ」をつくる
+		{
+			D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+			desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+			desc.NumDescriptors = 1;
+			desc.NodeMask = 0;
+			desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;// D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+			Hr = Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&Cb0vHeap));
+			assert(SUCCEEDED(Hr));
+		}
+		//コンスタントバッファ０の「ビュー」を「ディスクリプタヒープ」につくる
+		{
+			D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
+			desc.BufferLocation = ConstBuf0->GetGPUVirtualAddress();
+			desc.SizeInBytes = static_cast<UINT>(ConstBuf0->GetDesc().Width);
+			auto hCbvHeap = Cb0vHeap->GetCPUDescriptorHandleForHeapStart();
+			Device->CreateConstantBufferView(&desc, hCbvHeap);
+		}
+		//コンスタントバッファ０デフォルト設定
+		//ビューマトリックス
+		FLOAT3 eye = { 0, 0, 2 }, focus = { 0, 0, 0 }, up = { 0, 1, 0 };
+		ConstBuf0Map->view.lookat(eye, focus, up);
+		//プロジェクションマトリックス
+		float aspect = static_cast<float>(w.clientWidth()) / w.clientHeight();
+		ConstBuf0Map->proj.pers(3.141592f / 4, aspect, 1.0f, 10.0f);
+		//ライトの位置
+		ConstBuf0Map->lightPos = FLOAT3(0, 0, 1);
 	}
+
 	//パイプライン
 	{
 		//ルートシグネチャ
 		{
 			//ディスクリプタレンジ。ディスクリプタヒープとシェーダを紐づけるもの。
-			D3D12_DESCRIPTOR_RANGE range[3] = {};
+			D3D12_DESCRIPTOR_RANGE range[2] = {};
 			UINT b0 = 0;
 			range[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 			range[0].BaseShaderRegister = b0;
-			range[0].NumDescriptors = 1;
+			range[0].NumDescriptors = 3;
 			range[0].RegisterSpace = 0;
 			range[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-			UINT b1 = 1;
-			range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-			range[1].BaseShaderRegister = b1;
+			UINT t0 = 0;
+			range[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+			range[1].BaseShaderRegister = t0;
 			range[1].NumDescriptors = 1;
 			range[1].RegisterSpace = 0;
 			range[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-			UINT t0 = 0;
-			range[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-			range[2].BaseShaderRegister = t0;
-			range[2].NumDescriptors = 1;
-			range[2].RegisterSpace = 0;
-			range[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 			//ルートパラメタをディスクリプタテーブルとして使用
 			D3D12_ROOT_PARAMETER rootParam[1] = {};
@@ -232,22 +260,23 @@ void GRAPHIC::create()
 		}
 
 		//シェーダをリソースから読み込む
-		SHADER_RESOURCE vs(L"");
+		SHADER_RESOURCE vs(L"LAMBERT_VS");
 		assert(vs.succeeded());
-		SHADER_RESOURCE ps(L"");
+		SHADER_RESOURCE ps(L"LAMBERT_PS");
 		assert(ps.succeeded());
 
-
+		
 		//以下、各種記述
 
-		UINT slot0 = 0, slot1 = 1;
-		D3D12_INPUT_ELEMENT_DESC elementDescs[] = {
+		UINT slot0 = 0, slot1 = 1, slot2 = 2;
+		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, slot1, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, slot1, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    slot2, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		};
 
 		D3D12_RASTERIZER_DESC rasterDesc = {};
-		rasterDesc.FrontCounterClockwise = false;
+		rasterDesc.FrontCounterClockwise = true;
 		rasterDesc.CullMode = D3D12_CULL_MODE_NONE;
 		rasterDesc.FillMode = D3D12_FILL_MODE_SOLID;
 		rasterDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
@@ -285,7 +314,7 @@ void GRAPHIC::create()
 		pipelineDesc.pRootSignature = RootSignature.Get();
 		pipelineDesc.VS = { vs.code(), vs.size() };
 		pipelineDesc.PS = { ps.code(), ps.size() };
-		pipelineDesc.InputLayout = { elementDescs, _countof(elementDescs) };
+		pipelineDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
 		pipelineDesc.RasterizerState = rasterDesc;
 		pipelineDesc.BlendState = blendDesc;
 		pipelineDesc.DepthStencilState = depthStencilDesc;
@@ -315,59 +344,12 @@ void GRAPHIC::create()
 		ScissorRect.right = w.clientWidth();
 		ScissorRect.bottom = w.clientHeight();
 	}
-
-	//コンスタントバッファ０をつくる
-	{
-		auto prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-		auto desc = CD3DX12_RESOURCE_DESC::Buffer(256);
-		Hr = Device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-			D3D12_HEAP_FLAG_NONE,
-			&desc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&ConstBuf0)
-		);
-		assert(SUCCEEDED(Hr));
-
-		//マップしておいて、メインループ中で更新する。
-		Hr = ConstBuf0->Map(0, nullptr, (void**)&MapConstBuf0);
-		assert(SUCCEEDED(Hr));
-	}
-	//コンスタントバッファ０の「ビュー」の入れ物である「ディスクリプタヒープ」をつくる
-	{
-		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		desc.NumDescriptors = 1;
-		desc.NodeMask = 0;
-		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;// D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		Hr = Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&CbvHeap));
-		assert(SUCCEEDED(Hr));
-	}
-	//コンスタントバッファ０の「ビュー」を「ディスクリプタヒープ」につくる
-	{
-		D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
-		desc.BufferLocation = ConstBuf0->GetGPUVirtualAddress();
-		desc.SizeInBytes = static_cast<UINT>(ConstBuf0->GetDesc().Width);
-
-		auto hCbvHeap = CbvHeap->GetCPUDescriptorHandleForHeapStart();
-		Device->CreateConstantBufferView(&desc, hCbvHeap);
-	}
-	//ビューマトリックス
-	XMVECTOR eye = { 0, 0, -3.0f }, focus = { 0, 0, 0 }, up = { 0, 1, 0 };
-	XMMATRIX view = XMMatrixLookAtLH(eye, focus, up);
-	//プロジェクションマトリックス
-	XMMATRIX proj = XMMatrixPerspectiveFovLH(
-		XM_PIDIV4,
-		static_cast<float>(w.clientWidth()) / w.clientHeight(), 1.0f, 10.0f);
-	//コンスタントバッファ０更新
-	MapConstBuf0->view = view;
-	MapConstBuf0->proj = proj;
 }
 
 void GRAPHIC::destroy()
 {
 	WaitDrawDone();
+	ConstBuf0->Unmap(0, nullptr);
 }
 
 void GRAPHIC::clear(float r, float g, float b)
@@ -383,10 +365,10 @@ void GRAPHIC::clear(float r, float g, float b)
 	CommandList->ResourceBarrier(1, &barrier);
 
 	//バックバッファのディスクリプタハンドルを用意する
-	auto hBbvHeap = BackBufViewHeap->GetCPUDescriptorHandleForHeapStart();
-	hBbvHeap.ptr += BackBufIdx * BackBufViewHeapSize;
+	auto hBbvHeap = BbvHeap->GetCPUDescriptorHandleForHeapStart();
+	hBbvHeap.ptr += BackBufIdx * BbvHeapSize;
 	//デプスステンシルバッファのディスクリプタハンドルを用意する
-	auto hDsvHeap = DepthStencilBufViewHeap->GetCPUDescriptorHandleForHeapStart();
+	auto hDsvHeap = DsvHeap->GetCPUDescriptorHandleForHeapStart();
 	//バックバッファとデプスステンシルバッファを描画ターゲットとして設定する
 	CommandList->OMSetRenderTargets(1, &hBbvHeap, false, &hDsvHeap);
 
@@ -429,7 +411,6 @@ void GRAPHIC::present()
 	assert(SUCCEEDED(Hr));
 }
 
-/*
 void GRAPHIC::setPipeline()
 {
 	//パイプラインステートをセット
@@ -438,38 +419,7 @@ void GRAPHIC::setPipeline()
 	CommandList->SetGraphicsRootSignature(RootSignature.Get());
 }
 
-
-
-void GRAPHIC::createVtxPosition(std::vector<float> positions, ID3D12Resource** positionBuf, D3D12_VERTEX_BUFFER_VIEW* positionBufView)
-{
-	//positions.size()＝要素数、sizeof(float)＝バイト数
-	UINT numBytes = static_cast<UINT>(positions.size() * sizeof(float));
-
-	auto prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-	auto desc = CD3DX12_RESOURCE_DESC::Buffer(numBytes);
-	Hr = Device->CreateCommittedResource(
-		&prop,
-		D3D12_HEAP_FLAG_NONE,
-		&desc,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(positionBuf));
-	assert(SUCCEEDED(Hr));
-
-	//位置バッファに生データをコピー
-	UINT8* mappedBuf;
-	Hr = (*positionBuf)->Map(0, nullptr, reinterpret_cast<void**>(&mappedBuf));
-	assert(SUCCEEDED(Hr));
-	memcpy(mappedBuf, positions.data(), numBytes);
-	(*positionBuf)->Unmap(0, nullptr);
-
-	//位置バッファのビューを初期化しておく。（ディスクリプタヒープに作らなくてよい）
-	positionBufView->BufferLocation = (*positionBuf)->GetGPUVirtualAddress();
-	positionBufView->SizeInBytes = numBytes;
-	positionBufView->StrideInBytes = sizeof(float) * 3;
-}
-
-void GRAPHIC::createVtxPosition(float* positions, size_t size, ID3D12Resource** positionBuf, D3D12_VERTEX_BUFFER_VIEW* positionBufView)
+void GRAPHIC::createVertexBuf(float* vertices, size_t size, UINT stride, ID3D12Resource** vertexBuf, D3D12_VERTEX_BUFFER_VIEW* vertexBufView)
 {
 	auto prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 	auto desc = CD3DX12_RESOURCE_DESC::Buffer(size);
@@ -479,47 +429,23 @@ void GRAPHIC::createVtxPosition(float* positions, size_t size, ID3D12Resource** 
 		&desc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(positionBuf));
+		IID_PPV_ARGS(vertexBuf));
 	assert(SUCCEEDED(Hr));
 
 	//位置バッファに生データをコピー
 	UINT8* mappedBuf;
-	Hr = (*positionBuf)->Map(0, nullptr, reinterpret_cast<void**>(&mappedBuf));
+	Hr = (*vertexBuf)->Map(0, nullptr, reinterpret_cast<void**>(&mappedBuf));
 	assert(SUCCEEDED(Hr));
-	memcpy(mappedBuf, positions, size);
-	(*positionBuf)->Unmap(0, nullptr);
+	memcpy(mappedBuf, vertices, size);
+	(*vertexBuf)->Unmap(0, nullptr);
 
 	//位置バッファのビューを初期化しておく。（ディスクリプタヒープに作らなくてよい）
-	positionBufView->BufferLocation = (*positionBuf)->GetGPUVirtualAddress();
-	positionBufView->SizeInBytes = static_cast<UINT>(size);
-	positionBufView->StrideInBytes = sizeof(float) * 3;
+	vertexBufView->BufferLocation = (*vertexBuf)->GetGPUVirtualAddress();
+	vertexBufView->SizeInBytes = static_cast<UINT>(size);
+	vertexBufView->StrideInBytes = stride;
 }
 
-void GRAPHIC::createVtxTexcoord(float* texcoords, size_t size, ID3D12Resource** texcoordBuf, D3D12_VERTEX_BUFFER_VIEW* texcoordBufView)
-{
-	//テクスチャ座標バッファをつくる
-	auto prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-	auto desc = CD3DX12_RESOURCE_DESC::Buffer(size);
-	Hr = Device->CreateCommittedResource(
-		&prop, D3D12_HEAP_FLAG_NONE,
-		&desc, D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr, IID_PPV_ARGS(texcoordBuf));
-	assert(SUCCEEDED(Hr));
-
-	//テクスチャ座標バッファに生データをコピー
-	UINT8* mappedBuf;
-	Hr = (*texcoordBuf)->Map(0, nullptr, reinterpret_cast<void**>(&mappedBuf));
-	assert(SUCCEEDED(Hr));
-	memcpy(mappedBuf, texcoords, size);
-	(*texcoordBuf)->Unmap(0, nullptr);
-
-	//テクスチャ座標バッファのビューを初期化しておく。（ディスクリプタヒープに作らなくてよい）
-	texcoordBufView->BufferLocation = (*texcoordBuf)->GetGPUVirtualAddress();
-	texcoordBufView->SizeInBytes = static_cast<UINT>(size);
-	texcoordBufView->StrideInBytes = sizeof(float) * 2;
-}
-
-void GRAPHIC::createIndex(unsigned short* indices, size_t size, ID3D12Resource** indexBuf, D3D12_INDEX_BUFFER_VIEW* indexBufView)
+void GRAPHIC::createIndexBuf(unsigned short* indices, size_t size, ID3D12Resource** indexBuf, D3D12_INDEX_BUFFER_VIEW* indexBufView)
 {
 	//インデックスバッファをつくる
 	auto prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
@@ -546,35 +472,41 @@ void GRAPHIC::createIndex(unsigned short* indices, size_t size, ID3D12Resource**
 	indexBufView->SizeInBytes = static_cast<UINT>(size);;
 }
 
-void GRAPHIC::createConstBuf1(size_t size, ID3D12Resource** constBuf1, CONST_BUF1** mapConstBuf1)
+void GRAPHIC::createConstBuf(size_t size, ID3D12Resource** constBuf, void** constBufMap)
 {
 	//コンスタントバッファ１をつくる
 	auto prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-	auto desc = CD3DX12_RESOURCE_DESC::Buffer((size + 0xff) & ~0xff);
+	auto desc = CD3DX12_RESOURCE_DESC::Buffer((size + 0xff) & ~0xff);//256の倍数でなければならない
 	Hr = Device->CreateCommittedResource(
 		&prop,
 		D3D12_HEAP_FLAG_NONE,
 		&desc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(constBuf1)
+		IID_PPV_ARGS(constBuf)
 	);
 	assert(SUCCEEDED(Hr));
 
-	//マップしておいて、メインループ中で更新する。
-	Hr = (*constBuf1)->Map(0, nullptr, (void**)mapConstBuf1);
+	//マップしておく
+	Hr = (*constBuf)->Map(0, nullptr, constBufMap);
 	assert(SUCCEEDED(Hr));
 }
 
-void GRAPHIC::createTextureBuf(const char* filename, ID3D12Resource** textureBuf)
+#include <cstdlib> // wcstombsのために必要
+void GRAPHIC::createTextureBuf(LPCWSTR wcFilename, ID3D12Resource** textureBuf)
 {
+	char mbFilename[100]; // 変換先のマルチバイト文字列のバッファ
+	size_t count = 100; // 変換する最大バイト数
+	//ワイド文字列をマルチバイト文字列に変換
+	size_t result;	wcstombs_s(&result, mbFilename, count, wcFilename, count);
+	assert(result > 0);
+
 	//ファイルを読み込み、生データを取り出す
 	unsigned char* pixels;
 	int width, height, bytePerPixel;
-	//                  最後の引数でピクセルあたりのバイト数を強制できる↓
-	pixels = stbi_load(filename, &width, &height, &bytePerPixel, 4);
-	assert(pixels != nullptr);
-
+	pixels = stbi_load(mbFilename, &width, &height, &bytePerPixel, 4);
+	WARNING(pixels == nullptr, L"テクスチャが読み込めません", wcFilename);
+	
 	//１行のピッチを256の倍数にしておく(バッファサイズは256の倍数でなければいけない)
 	const UINT64 alignedRowPitch = (width * bytePerPixel + 0xff) & ~0xff;
 
@@ -668,13 +600,13 @@ void GRAPHIC::createTextureBuf(const char* filename, ID3D12Resource** textureBuf
 	stbi_image_free(pixels);
 }
 
-void GRAPHIC::createCbvTbvHeap(ID3D12Resource* constBuf1, ID3D12Resource* textureBuf, ID3D12DescriptorHeap** CbvTbvHeap)
+void GRAPHIC::createCbvTbvHeap(ID3D12Resource* constBuf1, ID3D12Resource* constBuf2, ID3D12Resource* textureBuf, ID3D12DescriptorHeap** CbvTbvHeap)
 {
 	//「ビュー」の入れ物である「ディスクリプタヒープ」をつくる
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		desc.NumDescriptors = 3;//コンスタントバッファ２つとテクスチャバッファ１つ
+		desc.NumDescriptors = 4;//コンスタントバッファ3つとテクスチャバッファ１つ
 		desc.NodeMask = 0;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		Hr = Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(CbvTbvHeap));
@@ -682,26 +614,29 @@ void GRAPHIC::createCbvTbvHeap(ID3D12Resource* constBuf1, ID3D12Resource* textur
 	}
 
 	auto hCbvTbvHeap = (*CbvTbvHeap)->GetCPUDescriptorHandleForHeapStart();
-	auto heapSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	auto cbvTbvHeapSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	//コンスタントバッファ０のディスクリプタヒープをこの「ディスクリプタヒープ」にコピー
+	//コンスタントバッファ０の「ディスクリプタヒープ」をこの「ディスクリプタヒープ」にコピー
 	{
-		auto hCbvHeap = CbvHeap->GetCPUDescriptorHandleForHeapStart();
-		Device->CopyDescriptorsSimple(1, hCbvTbvHeap, hCbvHeap, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		auto hCb0vHeap = Cb0vHeap->GetCPUDescriptorHandleForHeapStart();
+		Device->CopyDescriptorsSimple(1, hCbvTbvHeap, hCb0vHeap, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
-
-	hCbvTbvHeap.ptr += heapSize;
-
 	//コンスタントバッファ１の「ビュー」を「ディスクリプタヒープ」につくる
 	{
 		D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
 		desc.BufferLocation = constBuf1->GetGPUVirtualAddress();
 		desc.SizeInBytes = static_cast<UINT>(constBuf1->GetDesc().Width);
+		hCbvTbvHeap.ptr += cbvTbvHeapSize;
 		Device->CreateConstantBufferView(&desc, hCbvTbvHeap);
 	}
-
-	hCbvTbvHeap.ptr += heapSize;
-
+	//コンスタントバッファ２の「ビュー」を「ディスクリプタヒープ」につくる
+	{
+		D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
+		desc.BufferLocation = constBuf2->GetGPUVirtualAddress();
+		desc.SizeInBytes = static_cast<UINT>(constBuf2->GetDesc().Width);
+		hCbvTbvHeap.ptr += cbvTbvHeapSize;
+		Device->CreateConstantBufferView(&desc, hCbvTbvHeap);
+	}
 	//テクスチャバッファの「ビュー」を「ディスクリプタヒープ」につくる
 	{
 		D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
@@ -709,21 +644,23 @@ void GRAPHIC::createCbvTbvHeap(ID3D12Resource* constBuf1, ID3D12Resource* textur
 		desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
 		desc.Texture2D.MipLevels = 1;//ミップマップは使用しないので1
+		hCbvTbvHeap.ptr += cbvTbvHeapSize;
 		Device->CreateShaderResourceView(textureBuf, &desc, hCbvTbvHeap);
 	}
 }
 
 void GRAPHIC::draw(
 	D3D12_VERTEX_BUFFER_VIEW& positionBufView, 
-	D3D12_VERTEX_BUFFER_VIEW& texcoordBufView, 
+	D3D12_VERTEX_BUFFER_VIEW& normalBufView,
+	D3D12_VERTEX_BUFFER_VIEW& texcoordBufView,
 	D3D12_INDEX_BUFFER_VIEW& indexBufView, 
-	UINT numIndices,
 	ID3D12DescriptorHeap* cbvTbvHeap
 )
 {
 	//頂点をセット
 	D3D12_VERTEX_BUFFER_VIEW vertexBufViews[] = {
 		positionBufView,
+		normalBufView,
 		texcoordBufView,
 	};
 	CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -735,9 +672,9 @@ void GRAPHIC::draw(
 	auto hCbvTbvHeap = cbvTbvHeap->GetGPUDescriptorHandleForHeapStart();
 	CommandList->SetGraphicsRootDescriptorTable(0, hCbvTbvHeap);
 	//描画
-	CommandList->DrawIndexedInstanced(numIndices, 1, 0, 0, 0);
+	CommandList->DrawIndexedInstanced(indexBufView.SizeInBytes/2, 1, 0, 0, 0);
 }
-*/
+
 void GRAPHIC::WaitDrawDone()
 {
 	//現在のFence値がコマンド終了後にFenceに書き込まれるようにする
