@@ -135,6 +135,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="FILE_BUFFER.cpp" />
     <ClCompile Include="FLOAT3.cpp" />
     <ClCompile Include="GRAPHIC.cpp" />
     <ClCompile Include="MATRIX.cpp" />
@@ -142,11 +143,13 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="STATIC_MESH.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="WINDOW.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3dx12.h" />
+    <ClInclude Include="FILE_BUFFER.h" />
     <ClInclude Include="FLOAT3.h" />
     <ClInclude Include="FLOAT4.h" />
     <ClInclude Include="GRAPHIC.h" />
@@ -154,6 +157,7 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="QUATERNION.h" />
     <ClInclude Include="SHADER_RESOURCE.h" />
+    <ClInclude Include="STATIC_MESH.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="WARNING.h" />
     <ClInclude Include="WINDOW.h" />

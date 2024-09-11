@@ -19,6 +19,12 @@
     <ClCompile Include="FLOAT3.cpp">
       <Filter>MATH</Filter>
     </ClCompile>
+    <ClCompile Include="FILE_BUFFER.cpp">
+      <Filter>SYSTEM</Filter>
+    </ClCompile>
+    <ClCompile Include="STATIC_MESH.cpp">
+      <Filter>CONTAINER</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3dx12.h">
@@ -54,6 +60,12 @@
     <ClInclude Include="FLOAT3.h">
       <Filter>MATH</Filter>
     </ClInclude>
+    <ClInclude Include="FILE_BUFFER.h">
+      <Filter>SYSTEM</Filter>
+    </ClInclude>
+    <ClInclude Include="STATIC_MESH.h">
+      <Filter>CONTAINER</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="LambertPS.hlsl">
@@ -72,6 +84,9 @@
     </Filter>
     <Filter Include="MATH">
       <UniqueIdentifier>{a41c292e-674a-4846-8401-f766acc65941}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CONTAINER">
+      <UniqueIdentifier>{09076d14-71da-4382-beab-6d60d1fbf830}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

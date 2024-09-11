@@ -192,11 +192,11 @@ void GRAPHIC::create()
 		}
 		//コンスタントバッファ０デフォルト設定
 		//ビューマトリックス
-		FLOAT3 eye = { 0, 0, 2 }, focus = { 0, 0, 0 }, up = { 0, 1, 0 };
+		FLOAT3 eye = { 0, 0, 8 }, focus = { 0, 0, 0 }, up = { 0, 1, 0 };
 		ConstBuf0Map->view.lookat(eye, focus, up);
 		//プロジェクションマトリックス
 		float aspect = static_cast<float>(w.clientWidth()) / w.clientHeight();
-		ConstBuf0Map->proj.pers(3.141592f / 4, aspect, 1.0f, 10.0f);
+		ConstBuf0Map->proj.pers(3.141592f / 4, aspect, 1.0f, 21.0f);
 		//ライトの位置
 		ConstBuf0Map->lightPos = FLOAT3(0, 0, 1);
 	}
@@ -419,7 +419,7 @@ void GRAPHIC::setPipeline()
 	CommandList->SetGraphicsRootSignature(RootSignature.Get());
 }
 
-void GRAPHIC::createVertexBuf(float* vertices, size_t size, UINT stride, ID3D12Resource** vertexBuf, D3D12_VERTEX_BUFFER_VIEW* vertexBufView)
+void GRAPHIC::createVertexBuf(float* vertices, size_t size, size_t stride, ID3D12Resource** vertexBuf, D3D12_VERTEX_BUFFER_VIEW* vertexBufView)
 {
 	auto prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 	auto desc = CD3DX12_RESOURCE_DESC::Buffer(size);
@@ -442,7 +442,7 @@ void GRAPHIC::createVertexBuf(float* vertices, size_t size, UINT stride, ID3D12R
 	//位置バッファのビューを初期化しておく。（ディスクリプタヒープに作らなくてよい）
 	vertexBufView->BufferLocation = (*vertexBuf)->GetGPUVirtualAddress();
 	vertexBufView->SizeInBytes = static_cast<UINT>(size);
-	vertexBufView->StrideInBytes = stride;
+	vertexBufView->StrideInBytes = static_cast<UINT>(stride);
 }
 
 void GRAPHIC::createIndexBuf(unsigned short* indices, size_t size, ID3D12Resource** indexBuf, D3D12_INDEX_BUFFER_VIEW* indexBufView)
@@ -507,6 +507,107 @@ void GRAPHIC::createTextureBuf(LPCWSTR wcFilename, ID3D12Resource** textureBuf)
 	pixels = stbi_load(mbFilename, &width, &height, &bytePerPixel, 4);
 	WARNING(pixels == nullptr, L"テクスチャが読み込めません", wcFilename);
 	
+	//１行のピッチを256の倍数にしておく(バッファサイズは256の倍数でなければいけない)
+	const UINT64 alignedRowPitch = (width * bytePerPixel + 0xff) & ~0xff;
+
+	//アップロード用中間バッファをつくり、生データをコピーしておく
+	ComPtr<ID3D12Resource> uploadBuf;
+	{
+		//テクスチャではなくフツーのバッファとしてつくる
+		auto prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		auto desc = CD3DX12_RESOURCE_DESC::Buffer(alignedRowPitch * height);
+		Hr = Device->CreateCommittedResource(
+			&prop,
+			D3D12_HEAP_FLAG_NONE,
+			&desc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&uploadBuf));
+		assert(SUCCEEDED(Hr));
+
+		//生データをuploadbuffに一旦コピーします
+		uint8_t* mapBuf = nullptr;
+		Hr = uploadBuf->Map(0, nullptr, (void**)&mapBuf);//マップ
+		auto srcAddress = pixels;
+		auto originalRowPitch = width * bytePerPixel;
+		for (int y = 0; y < height; ++y) {
+			memcpy(mapBuf, srcAddress, originalRowPitch);
+			//1行ごとの辻褄を合わせてやる
+			srcAddress += originalRowPitch;
+			mapBuf += alignedRowPitch;
+		}
+		uploadBuf->Unmap(0, nullptr);//アンマップ
+	}
+
+	//そして、最終コピー先であるテクスチャバッファを作る
+	{
+		auto prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		auto desc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, width, height);
+		Hr = Device->CreateCommittedResource(
+			&prop,
+			D3D12_HEAP_FLAG_NONE,
+			&desc,
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			nullptr,
+			IID_PPV_ARGS(textureBuf));
+		assert(SUCCEEDED(Hr));
+	}
+
+	//uploadBufからtextureBufへコピーする長い道のりが始まります
+
+	//まずコピー元ロケーションの準備・フットプリント指定
+	D3D12_TEXTURE_COPY_LOCATION src = {};
+	src.pResource = uploadBuf.Get();
+	src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+	src.PlacedFootprint.Footprint.Width = static_cast<UINT>(width);
+	src.PlacedFootprint.Footprint.Height = static_cast<UINT>(height);
+	src.PlacedFootprint.Footprint.Depth = static_cast<UINT>(1);
+	src.PlacedFootprint.Footprint.RowPitch = static_cast<UINT>(alignedRowPitch);
+	src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	//コピー先ロケーションの準備・サブリソースインデックス指定
+	D3D12_TEXTURE_COPY_LOCATION dst = {};
+	dst.pResource = *textureBuf;
+	dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+	dst.SubresourceIndex = 0;
+
+	//コマンドリストでコピーを予約しますよ！！！
+	CommandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+	//ってことはバリアがいるのです
+	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+		*textureBuf,
+		D3D12_RESOURCE_STATE_COPY_DEST,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+	);
+	CommandList->ResourceBarrier(1, &barrier);
+	//uploadBufアンロード
+	CommandList->DiscardResource(uploadBuf.Get(), nullptr);
+	//コマンドリストを閉じて
+	CommandList->Close();
+	//実行
+	ID3D12CommandList* commandLists[] = { CommandList.Get() };
+	CommandQueue->ExecuteCommandLists(_countof(commandLists), commandLists);
+	//リソースがGPUに転送されるまで待機する
+	WaitDrawDone();
+
+	//コマンドアロケータをリセット
+	HRESULT Hr = CommandAllocator->Reset();
+	assert(SUCCEEDED(Hr));
+	//コマンドリストをリセット
+	Hr = CommandList->Reset(CommandAllocator.Get(), nullptr);
+	assert(SUCCEEDED(Hr));
+
+	//開放
+	stbi_image_free(pixels);
+}
+
+void GRAPHIC::createTextureBuf(LPCSTR filename, ID3D12Resource** textureBuf)
+{
+	//ファイルを読み込み、生データを取り出す
+	unsigned char* pixels;
+	int width, height, bytePerPixel;
+	pixels = stbi_load(filename, &width, &height, &bytePerPixel, 4);
+	WARNING(pixels == nullptr, L"テクスチャが読み込めません", filename);
+
 	//１行のピッチを256の倍数にしておく(バッファサイズは256の倍数でなければいけない)
 	const UINT64 alignedRowPitch = (width * bytePerPixel + 0xff) & ~0xff;
 
@@ -666,6 +767,11 @@ void GRAPHIC::draw(
 	CommandList->SetGraphicsRootDescriptorTable(0, hCbvTbvHeap);
 	//描画
 	CommandList->DrawIndexedInstanced(ibv.SizeInBytes/2, 1, 0, 0, 0);
+}
+
+void GRAPHIC::setView(FLOAT3& eye, FLOAT3& focus, FLOAT3& up)
+{
+	ConstBuf0Map->view.lookat(eye, focus, up);
 }
 
 void GRAPHIC::WaitDrawDone()

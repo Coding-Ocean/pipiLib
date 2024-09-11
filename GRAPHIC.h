@@ -14,7 +14,7 @@ public:
     void setPipeline();
 
     void createVertexBuf(
-        float* vertices, size_t size, UINT stride,
+        float* vertices, size_t size, size_t stride,
         ID3D12Resource** vertexBuf,
         D3D12_VERTEX_BUFFER_VIEW* vertexBufView
     );
@@ -49,6 +49,10 @@ public:
         ID3D12Resource** textureBuf
     );
 
+    void createTextureBuf(
+        LPCSTR filename,
+        ID3D12Resource** textureBuf
+    );
     //ルートテーブルに対応するディスクリプタヒープをつくる
     void createCbvTbvHeap(
         ID3D12Resource* constBuf1,
@@ -62,6 +66,8 @@ public:
         D3D12_INDEX_BUFFER_VIEW& indexBufView,
         ID3D12DescriptorHeap* CbvTbvHeap
     );
+
+    void setView(FLOAT3& eye, FLOAT3& focus, FLOAT3& up);
 
 private:
     void WaitDrawDone();
