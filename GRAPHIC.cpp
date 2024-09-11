@@ -268,11 +268,11 @@ void GRAPHIC::create()
 		
 		//以下、各種記述
 
-		UINT slot0 = 0, slot1 = 1, slot2 = 2;
+		UINT slot0 = 0;
 		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, slot1, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    slot2, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, slot0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, slot0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    slot0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		};
 
 		D3D12_RASTERIZER_DESC rasterDesc = {};
@@ -650,29 +650,22 @@ void GRAPHIC::createCbvTbvHeap(ID3D12Resource* constBuf1, ID3D12Resource* constB
 }
 
 void GRAPHIC::draw(
-	D3D12_VERTEX_BUFFER_VIEW& positionBufView, 
-	D3D12_VERTEX_BUFFER_VIEW& normalBufView,
-	D3D12_VERTEX_BUFFER_VIEW& texcoordBufView,
-	D3D12_INDEX_BUFFER_VIEW& indexBufView, 
+	D3D12_VERTEX_BUFFER_VIEW& vbv,
+	D3D12_INDEX_BUFFER_VIEW& ibv, 
 	ID3D12DescriptorHeap* cbvTbvHeap
 )
 {
 	//頂点をセット
-	D3D12_VERTEX_BUFFER_VIEW vertexBufViews[] = {
-		positionBufView,
-		normalBufView,
-		texcoordBufView,
-	};
 	CommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	CommandList->IASetVertexBuffers(0, _countof(vertexBufViews), vertexBufViews);
-	CommandList->IASetIndexBuffer(&indexBufView);
+	CommandList->IASetVertexBuffers(0, 1, &vbv);
+	CommandList->IASetIndexBuffer(&ibv);
 	//コマンドリストにディスクリプタヒープをセット
 	CommandList->SetDescriptorHeaps(1, &cbvTbvHeap);
 	//ディスクリプタテーブルにディスクリプタヒープをセット
 	auto hCbvTbvHeap = cbvTbvHeap->GetGPUDescriptorHandleForHeapStart();
 	CommandList->SetGraphicsRootDescriptorTable(0, hCbvTbvHeap);
 	//描画
-	CommandList->DrawIndexedInstanced(indexBufView.SizeInBytes/2, 1, 0, 0, 0);
+	CommandList->DrawIndexedInstanced(ibv.SizeInBytes/2, 1, 0, 0, 0);
 }
 
 void GRAPHIC::WaitDrawDone()

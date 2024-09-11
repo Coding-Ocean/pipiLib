@@ -58,12 +58,11 @@ public:
     );
 
     void draw(
-        D3D12_VERTEX_BUFFER_VIEW& positionBufView,
-        D3D12_VERTEX_BUFFER_VIEW& normalBufView,
-        D3D12_VERTEX_BUFFER_VIEW& texcoordBufView,
+        D3D12_VERTEX_BUFFER_VIEW& vertexBufView,
         D3D12_INDEX_BUFFER_VIEW& indexBufView,
         ID3D12DescriptorHeap* CbvTbvHeap
     );
+
 private:
     void WaitDrawDone();
 
