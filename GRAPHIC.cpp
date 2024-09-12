@@ -277,7 +277,7 @@ void GRAPHIC::create()
 
 		D3D12_RASTERIZER_DESC rasterDesc = {};
 		rasterDesc.FrontCounterClockwise = true;
-		rasterDesc.CullMode = D3D12_CULL_MODE_NONE;
+		rasterDesc.CullMode = D3D12_CULL_MODE_BACK;
 		rasterDesc.FillMode = D3D12_FILL_MODE_SOLID;
 		rasterDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
 		rasterDesc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;

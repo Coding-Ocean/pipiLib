@@ -143,6 +143,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="primitive.cpp" />
     <ClCompile Include="STATIC_MESH.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="WINDOW.cpp" />
@@ -155,6 +156,7 @@
     <ClInclude Include="GRAPHIC.h" />
     <ClInclude Include="MATRIX.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="primitive.h" />
     <ClInclude Include="QUATERNION.h" />
     <ClInclude Include="SHADER_RESOURCE.h" />
     <ClInclude Include="STATIC_MESH.h" />

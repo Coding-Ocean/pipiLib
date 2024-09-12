@@ -52,7 +52,7 @@ void STATIC_MESH::create(const char* filename)
 
 	//コンスタントバッファ２(Material)をつくる
 	g.createConstBuf(sizeof(GRAPHIC::CONST_BUF2), &ConstBuf2, (void**)&ConstBuf2Map);
-	ConstBuf2Map->diffuse = { 1.0f, 0.5f, 0.5f, 1.0f };
+	ConstBuf2Map->diffuse = { 1.0f, 1.0f, 1.0f, 1.0f };
 	ConstBuf2Map->ambient = { 0.0f, 0.0f, 0.0f, 1.0f };
 	ConstBuf2Map->specular = { 0.0f, 0.0f, 0.0f, 1.0f };
 

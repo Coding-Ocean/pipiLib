@@ -25,6 +25,7 @@
     <ClCompile Include="STATIC_MESH.cpp">
       <Filter>CONTAINER</Filter>
     </ClCompile>
+    <ClCompile Include="primitive.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3dx12.h">
@@ -66,6 +67,7 @@
     <ClInclude Include="STATIC_MESH.h">
       <Filter>CONTAINER</Filter>
     </ClInclude>
+    <ClInclude Include="primitive.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="LambertPS.hlsl">
