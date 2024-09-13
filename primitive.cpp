@@ -10,6 +10,184 @@ struct VERTEX {
 	float u = 0, v = 0;    //　テクスチャ座標
 };
 
+void createCubeText(float l)
+{
+	//頂点
+	VERTEX vertices[] = {
+		//正面
+		-l, l, l, 0,0,1, 0,0,
+		-l,-l, l, 0,0,1, 0,1,
+		 l,-l, l, 0,0,1, 1,1,
+		 l, l, l, 0,0,1, 1,0,
+		//裏面
+		 l, l,-l, 0,0,-1, 0,0,
+		 l,-l,-l, 0,0,-1, 0,1,
+		-l,-l,-l, 0,0,-1, 1,1,
+		-l, l,-l, 0,0,-1, 1,0,
+		//右面
+		 l, l, l, 1,0,0, 0,0,
+		 l,-l, l, 1,0,0, 0,1,
+		 l,-l,-l, 1,0,0, 1,1,
+		 l, l,-l, 1,0,0, 1,0,
+		//左面
+		-l, l,-l, -1,0,0, 0,0,
+		-l,-l,-l, -1,0,0, 0,1,
+		-l,-l, l, -1,0,0, 1,1,
+		-l, l, l, -1,0,0, 1,0,
+		//上面
+		-l, l,-l, 0,1,0, 0,0,
+		-l, l, l, 0,1,0, 0,1,
+		 l, l, l, 0,1,0, 1,1,
+		 l, l,-l, 0,1,0, 1,0,
+		//下面
+		-l,-l, l, 0,-1,0, 0,0,
+		-l,-l,-l, 0,-1,0, 0,1,
+		 l,-l,-l, 0,-1,0, 1,1,
+		 l,-l, l, 0,-1,0, 1,0,
+	};
+	//インデックス
+	unsigned short indices[] = {
+		0,1,2,
+		0,2,3,
+		4,5,6,
+		4,6,7,
+		8,9,10,
+		8,10,11,
+		12,13,14,
+		12,14,15,
+		16,17,18,
+		16,18,19,
+		20,21,22,
+		20,22,23,
+	};
+
+	//ファイルに出力
+	std::ofstream fout("assets/cube.txt");
+	
+	fout << "v cube pnt " << _countof(vertices) << std::endl;
+	for (auto& v : vertices) {
+		fout << v.x << ' ' << v.y << ' ' << v.z << ' '
+			<< v.nx << ' ' << v.ny << ' ' << v.nz << ' '
+			<< v.u << ' ' << v.v << std::endl;
+	}
+
+	fout << "i cube " << _countof(indices) << std::endl;
+	int cnt = 0;
+	for (auto& i : indices) {
+		fout << i;
+		if (++cnt >= 3) {
+			cnt = 0;
+			fout << std::endl;
+		}
+		else {
+			fout << ' ';
+		}
+	}
+
+	fout << "x banana assets/banana.png";
+}
+
+void createSphereText(float radius, int numCorners)
+{
+	//頂点
+	std::vector<VERTEX> vertices;
+	{
+		//北極南極点以外の頂点
+		float divAngle = 3.141592f * 2 / numCorners;
+		VERTEX v;
+		float r;
+		for (int j = 1; j < numCorners / 2; j++) {
+			v.ny = cos(divAngle * j);
+			v.y = v.ny * radius;
+			r = sin(divAngle * j);
+			v.v = (1.0f - asin(v.ny) / (3.141592f / 2.0f)) / 2.0f;
+			for (int i = 0; i <= numCorners; i++) {
+				v.nx = cos(divAngle * i) * r;
+				v.x = v.nx * radius;
+				v.nz = sin(divAngle * i) * r;
+				v.z = v.nz * radius;
+				v.u = atan2(v.z, v.x) / (3.141592f * 2);
+				if (i > numCorners / 2)	v.u += 1.0f;
+				v.u *= -1;
+				vertices.push_back(v);
+			}
+		}
+		//北極点
+		v.x = 0; v.y = radius; v.z = 0; v.nx = 0, v.ny = 1, v.nz = 0;
+		v.u = 0.5f; v.v = 0;
+		vertices.push_back(v);
+		//南極点
+		v.y = -radius; v.ny = -1;
+		v.u = 0.5f; v.v = 1;
+		vertices.push_back(v);
+	}
+	//インデックス
+	std::vector<unsigned short> indices;
+	{
+		int stride = numCorners + 1;
+		for (int j = 0; j < numCorners / 2 - 2; j++) {
+			for (int i = 0; i < numCorners; i++) {
+				int k = i + stride * j;
+				indices.push_back(k);
+				indices.push_back(k + stride + 1);
+				indices.push_back(k + stride);
+				indices.push_back(k);
+				indices.push_back(k + 1);
+				indices.push_back(k + stride + 1);
+			}
+		}
+		//北極点のインデックスn
+		{
+			int n = (numCorners + 1) * (numCorners / 2 - 1);
+			for (int i = 0; i < numCorners; i++) {
+				indices.push_back(n);
+				indices.push_back(i + 1);
+				indices.push_back(i);
+			}
+		}
+		//南極点のインデックスs
+		{
+			int s = (numCorners + 1) * (numCorners / 2 - 1) + 1;
+			int j = numCorners / 2 - 2;
+			for (int i = 0; i < numCorners; i++) {
+				int k = i + (numCorners + 1) * j;
+				indices.push_back(k);
+				indices.push_back(k + 1);
+				indices.push_back(s);
+			}
+		}
+	}
+
+	//ファイルに出力----------------------------------------------------------
+	//頂点出力
+	std::ofstream fout("../pipiApp/assets/sphere.txt");
+	fout << "v sphere pnt " << vertices.size() << std::endl;
+	for (auto& v : vertices) {
+		fout << std::fixed << v.x << ' ' << v.y << ' ' << v.z << ' '
+			<< v.nx << ' ' << v.ny << ' ' << v.nz << ' '
+			<< v.u << ' ' << v.v << std::endl;
+	}
+	//インデックス出力
+	fout << "i sphere " << indices.size() << std::endl;
+	int cnt = 0;
+	for (auto& i : indices) {
+		fout << i;
+		if (++cnt >= 3) {
+			cnt = 0;
+			fout << std::endl;
+		}
+		else {
+			fout << ' ';
+		}
+	}
+	//テクスチャ名出力
+	//fout << "x banana assets/banana.png ";
+	fout << "x earth assets/earth.png ";
+	//fout << "x moon assets/moon.png ";
+	//fout << "x moon assets/sun.png ";
+}
+
+/*
 void createVtxSquare(float l)
 {
 	VERTEX vertices[] = {
@@ -332,3 +510,4 @@ void createIdxCylinder(int numCorners)
 	}
 	//return createIndexBuffer(indices.data(), (int)indices.size());
 }
+*/

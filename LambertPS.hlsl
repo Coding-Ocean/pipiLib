@@ -7,5 +7,5 @@ struct IN {
 };
 
 float4 main( IN i ) : SV_TARGET {
-    return Texture.Sample( Sampler, i.tex ) * i.diffuse;
+    return Texture.Sample(Sampler, i.tex) * i.diffuse;
 }

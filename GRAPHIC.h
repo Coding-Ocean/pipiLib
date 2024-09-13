@@ -53,6 +53,7 @@ public:
         LPCSTR filename,
         ID3D12Resource** textureBuf
     );
+
     //ルートテーブルに対応するディスクリプタヒープをつくる
     void createCbvTbvHeap(
         ID3D12Resource* constBuf1,

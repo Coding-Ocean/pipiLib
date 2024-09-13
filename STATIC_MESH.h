@@ -6,7 +6,7 @@ class STATIC_MESH
 public:
     STATIC_MESH();
     ~STATIC_MESH();
-    void create(const char* filename);
+    void createFromText(const wchar_t* filename);
     void update(const MATRIX& m);
     void draw();
 private:
